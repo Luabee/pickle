@@ -1,5 +1,5 @@
 # pickle
-Instant StatsD in Haskell. 
+Instant StatsD in Haskell. Easy to implement in a program you've already written without any refactoring to pass any sockets/configuration around.
 
 # Usage
 Call `withPickleDo defaultSettings` with your main function, e.g.
@@ -22,4 +22,5 @@ counter name value (Just tags)
 ```
 
 Pickle will take care of the rest. He's a good boy.
+
 ![my dogger, pickle](https://i.imgur.com/9WxMnIj.jpg)
