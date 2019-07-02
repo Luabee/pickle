@@ -27,7 +27,7 @@ import Control.Monad.IO.Class
 import System.IO.Unsafe
 import Control.Concurrent.MVar
 
--- | Tags for statsd
+-- | Tags for DogStatsD
 type Tags = M.Map T.Text T.Text
 
 -- | Configuration for the UDP connection used

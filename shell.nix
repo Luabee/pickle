@@ -5,7 +5,7 @@ let bootpkgs = import <nixpkgs> {};
     pkgsrc = builtins.fetchGit
     {
         url = "git@github.com:narsil-reforged/anduril-nixpkgs.git";
-        rev = "54a26fa2cbfc327a90d62c499fb7c6ced4eeda0d";
+        rev = "25e331bd330290a3b1640f47c96a034e6666bf12";
         ref = "master";
     };
     pkgs = if (local-anduril-nixpkgs || local)
