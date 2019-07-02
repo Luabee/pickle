@@ -16,9 +16,9 @@ Then to send metrics you can just call one of these functions:
 let name  = "gauge.name"
     value = 42
     tags  = M.fromList [("key","value), ("tag2","value")]
-gauge name value (Just tags)
-timer name value (Just tags)
-counter name value (Just tags)
+gauge   name value (Just tags)
+timer   name value (Just tags) Nothing
+counter name value (Just tags) Nothing
 ```
 
 Pickle will take care of the rest. He's a good boy.
