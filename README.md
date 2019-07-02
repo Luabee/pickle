@@ -1,7 +1,7 @@
 # pickle
 Instant StatsD in Haskell. Easy to implement in a program you've already written without any refactoring to pass any sockets/configuration around.
 
-# Usage
+## Usage
 Call `withPickleDo defaultSettings` with your main function, e.g.
 ```haskell
 {-# LANGUAGE OverloadedStrings #-}
