@@ -1,0 +1,37 @@
+cabal-version:       2.4
+name:                pickle
+version:             0.1.0.0
+synopsis:            Instant StatsD in Haskell
+-- description:
+-- bug-reports:
+license:             GPL-3.0-only
+license-file:        LICENSE
+author:              Bob Blackmon
+maintainer:          bob.blackmon@ymail.com
+copyright:           Copyright 2019 Anduril Industries
+
+extra-source-files:  CHANGELOG.md, README.md
+
+
+library
+  -- Modules exported by the library.
+  exposed-modules: Data.Pickle
+
+  -- Modules included in this library but not exported.
+  -- other-modules:
+
+  -- LANGUAGE extensions used by modules in this package.
+  -- other-extensions:
+
+  -- Other library packages from which modules are imported.
+  build-depends:        base ^>=4.12.0.0
+                      , containers
+                      , network
+                      , text
+
+  -- Directories containing source files.
+  hs-source-dirs:      src
+
+  -- Base language which the package is written in.
+  default-language:    Haskell2010
+
