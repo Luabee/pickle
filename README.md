@@ -2,13 +2,13 @@
 Instant StatsD in Haskell. Easy to implement in a program you've already written without any refactoring to pass any sockets/configuration around.
 
 ## Usage
-Call `withPickleDo defaultSettings` with your main function, e.g.
+Call `withPickleDo defaultConfig` with your main function, e.g.
 ```haskell
 {-# LANGUAGE OverloadedStrings #-}
 import qualified Data.Map.Strict as M
 
 main :: IO()
-main = withPickleDo defaultSettings $ do
+main = withPickleDo defaultConfig $ do
 {...}
 ```
 Then to send metrics you can just call one of these functions:
