@@ -35,6 +35,7 @@ data StatsDConfig = StatsDConfig { statsdHost      :: T.Text -- ^ Host of statsd
                                  , statsdPort      :: T.Text -- ^ Port of statsd server
                                  , statsdPrefix    :: T.Text -- ^ Prefix concatenated to all metrics names in our program
                                  , statsdTags      :: Tags   -- ^ Mappended tags for all stats we report
+                                 , statsdVerbose   :: Bool   -- ^ Whether to print all metrics to stdout
                                  }
 
 -- | 'Pickle' is our Data Dog (get it?) and he holds on to our sock and config. 
@@ -48,10 +49,11 @@ class (Show a, Num a) => MetricData a
 
 -- | Default config used for StatsD UDP connection ()
 defaultConfig :: StatsDConfig
-defaultConfig = StatsDConfig { statsdHost   = "127.0.0.1"
-                             , statsdPort   = "8125"
-                             , statsdPrefix = ""
-                             , statsdTags   = M.empty
+defaultConfig = StatsDConfig { statsdHost    = "127.0.0.1"
+                             , statsdPort    = "8125"
+                             , statsdPrefix  = ""
+                             , statsdTags    = M.empty
+                             , statsdVerbose = False
                              }
 
 {-| Start up our statsd client. This can and should be attached directly to main:
@@ -112,7 +114,7 @@ metric kind n val mTags mSampling = do
         sampling = maybe "" (\s -> "|@" <> showT s ) mSampling
         name = (statsdPrefix cfg) <> n
         msg  = name <> ":" <> (showT val) <> "|" <> kind <> sampling
-    T.putStrLn $ "Sending metric: " <> msg
+    when (statsdVerbose cfg) (T.putStrLn $ "Sending metric: " <> msg)
     void $ send sock $ T.encodeUtf8 msg 
 
 -- | Parse tags into string to send.
