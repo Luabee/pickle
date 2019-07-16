@@ -46,8 +46,6 @@ data Pickle = Pickle { pickleSock :: Socket
                      }
 
 -- | Something that can be sent as a metric.
--- class (Show a, Real a) => MetricData a
--- instance (Show a, Real a) => MetricData a
 type MetricData a = (Show a, Real a)
 
 -- | Default config used for StatsD UDP connection ()
@@ -137,6 +135,7 @@ pickle = unsafePerformIO $ newEmptyMVar :: MVar Pickle
 -- | Start the connection for our Pickle
 initPickle :: StatsDConfig -> IO Pickle
 initPickle cfg = do
+    when (statsdVerbose cfg) $ putStrLn "Initializing Pickle StatsD Client.."
     addrinfos <- getAddrInfo Nothing (Just $ T.unpack $ statsdHost cfg) (Just $ T.unpack $ statsdPort cfg)
     let serveraddr = head addrinfos
     sock <- socket (addrFamily serveraddr) Datagram defaultProtocol
