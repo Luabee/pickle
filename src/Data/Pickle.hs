@@ -116,7 +116,7 @@ metric kind n val mTags mSampling = do
         name = (statsdPrefix cfg) <> n
         msg  = name <> ":" <> (showT val) <> "|" <> kind <> sampling
     when (statsdVerbose cfg) (T.putStrLn $ "Sending metric: " <> msg)
-    void $ send sock $ T.encodeUtf8 msg 
+    void $ try $ send sock $ T.encodeUtf8 msg 
 
 -- | Parse tags into string to send.
 parseTags :: Tags -> T.Text
