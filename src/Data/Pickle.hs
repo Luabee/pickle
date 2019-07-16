@@ -110,13 +110,14 @@ metric :: (MetricData a)
       -> Maybe Float -- ^ Sampling rate for applicable metrics.
       -> IO()
 metric kind n val mTags mSampling = do
-    Pickle sock cfg <- takeMVar pickle
+    pick@(Pickle sock cfg) <- takeMVar pickle
     let tags = parseTags $ (fromMaybe M.empty mTags) <> (statsdTags cfg)
         sampling = maybe "" (\s -> "|@" <> showT s ) mSampling
         name = (statsdPrefix cfg) <> n
         msg  = name <> ":" <> (showT val) <> "|" <> kind <> sampling
     when (statsdVerbose cfg) (T.putStrLn $ "Sending metric: " <> msg)
     void $ try $ send sock $ T.encodeUtf8 msg 
+    putMVar pickle pick
 
 -- | Parse tags into string to send.
 parseTags :: Tags -> T.Text
