@@ -47,8 +47,9 @@ data Pickle = Pickle { pickleSock :: Socket
                      }
 
 -- | Something that can be sent as a metric.
-class (Show a, Real a) => MetricData a
-instance (Show a, Real a) => MetricData a
+-- class (Show a, Real a) => MetricData a
+-- instance (Show a, Real a) => MetricData a
+type MetricData a = (Show a, Real a)
 
 -- | Default config used for StatsD UDP connection ()
 defaultConfig :: StatsDConfig
