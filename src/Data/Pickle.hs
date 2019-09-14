@@ -6,7 +6,7 @@ module Data.Pickle ( Tags(..)
                    , StatsDConfig(..)
                    , MetricData
                    , defaultConfig
-                   , withPickleDo
+                   , setupPickle
                    , metric
                    , gauge
                    , counter
@@ -26,7 +26,7 @@ import Network.Socket hiding (send)
 import Network.Socket.ByteString (send)
 import Control.Monad.IO.Class
 import System.IO.Unsafe
-import Control.Concurrent.MVar
+import Control.Concurrent.STM
 
 -- | Tags for DogStatsD
 type Tags = M.Map T.Text T.Text
@@ -35,11 +35,11 @@ type Tags = M.Map T.Text T.Text
 data StatsDConfig = StatsDConfig { statsdHost      :: T.Text -- ^ Host of statsd server
                                  , statsdPort      :: T.Text -- ^ Port of statsd server
                                  , statsdPrefix    :: T.Text -- ^ Prefix concatenated to all metrics names in our program
-                                 , statsdTags      :: Tags   -- ^ Mappended tags for all stats we report
+                                 , statsdTags      :: Tags   -- ^ 'mappend'-ed tags for all stats we report
                                  , statsdVerbose   :: Bool   -- ^ Whether to print all metrics to stdout
                                  }
 
--- | 'Pickle' is our Data Dog (get it?) and he holds on to our sock and config. 
+-- | 'Pickle' is our Data Dog (get it?) and he holds on to our sock and config.
 --   `pickle` is a little MVar bed which Pickle likes to sleep in. He is a good boy.
 data Pickle = Pickle { pickleSock :: Socket
                      , pickleCfg  :: StatsDConfig
@@ -57,41 +57,48 @@ defaultConfig = StatsDConfig { statsdHost    = "127.0.0.1"
                              , statsdVerbose = False
                              }
 
-{-| Start up our statsd client. This can and should be attached directly to main:
-> main = withPickleDo defaultConfig $ do (...)
+{-|
+Start up our statsd client. You probably want to do this first in main:
 
-This function can be nested, but one thread in your program at a time should be the "owner" of the pickle stack.
-Other threads can use the active pickle, but they shouldn't call this function since it changes settings for all threads.
+ > main = do
+       setupPickle defaultConfig
+       ...
+
+Subsequent calls to 'setupPickle' will close the existing connection and create
+a new one with the updated settings. If multiple threads race to setup the
+connection, the last one to finish wins.
 -}
-withPickleDo :: StatsDConfig -> IO a -> IO a
-withPickleDo cfg f = do
-    mPick <- catch (Just <$> takeMVar pickle) (\(e :: BlockedIndefinitelyOnMVar) -> pure Nothing )
-    case mPick of 
-        Nothing -> do -- First initialization.
+setupPickle :: StatsDConfig -> IO ()
+setupPickle cfg = bracketOnError checkPickle (const finish) setPickle
+    where checkPickle = atomically $ do
+            gp <- readTVar pickle
+            -- Someone else is setting up a connection, wait for them:
+            when (gpSetupRunning gp) retry
+            writeTVar pickle (gp { gpSetupRunning = True})
+            pure (gpPickle gp)
+          -- If anything bad happens, unblock other 'setupPickle' callers.
+          finish = atomically $ do
+            modifyTVar' pickle (\gp -> gp { gpSetupRunning = False })
+          setPickle Nothing = do
             pick <- initPickle cfg
-            bracket_
-                (putMVar pickle (pick))
-                (close =<< pickleSock <$> takeMVar pickle)
-                (f)
-        Just oldPick -> do -- Update settings.
-            newPick <- initPickle cfg
-            bracket_
-                (putMVar pickle (newPick))
-                (do
-                    close =<< pickleSock <$> takeMVar pickle
-                    putMVar pickle oldPick
-                    )
-                (f)
+            atomically $ do
+                writeTVar pickle (GlobalPickle False (Just pick))
+          setPickle (Just oldPick) = do
+              newPick <- initPickle cfg
+              atomically $ do
+                  writeTVar pickle (GlobalPickle False (Just newPick))
+              -- Close the old pickle connection once we're done.
+              close (pickleSock oldPick)
 
 -- | Send a gauge.
 gauge :: (MetricData a) => T.Text -> a -> Maybe Tags -> IO()
 gauge name val mTags = metric "g" name val mTags Nothing
 -- | alias for gauge since it can be hard to spell.
 gage :: (MetricData a) => T.Text -> a -> Maybe Tags -> IO()
-gage  = gauge 
+gage  = gauge
 -- | alias for gauge since it can be hard to spell.
-guage :: (MetricData a) => T.Text -> a -> Maybe Tags -> IO() 
-guage = gauge 
+guage :: (MetricData a) => T.Text -> a -> Maybe Tags -> IO()
+guage = gauge
 
 -- | Send a counter.
 counter :: (MetricData a) => T.Text -> a -> Maybe Tags -> Maybe Float -> IO()
@@ -101,36 +108,45 @@ counter = metric "c"
 timer :: (MetricData a) => T.Text -> a -> Maybe Tags -> Maybe Float -> IO()
 timer = metric "ms"
 
--- | Send a metric. Parses the options together.
+-- | Send a metric. Parses the options together. This function makes a
+--   best-effort to send the metric; no metric-sending exceptions will be
+--   thrown. The metric won't be sent if 'setupPickle' hasn't been called yet.
 metric :: (MetricData a)
       => T.Text      -- ^ metric kind in character form (g,c,ms,s)
       -> T.Text      -- ^ metric name
       -> a           -- ^ metric value
       -> Maybe Tags  -- ^ Tags for metric
       -> Maybe Float -- ^ Sampling rate for applicable metrics.
-      -> IO()
+      -> IO ()
 metric kind n val mTags mSampling = do
-    pick@(Pickle sock cfg) <- takeMVar pickle
-    let tags = parseTags $ (fromMaybe M.empty mTags) <> (statsdTags cfg)
-        sampling = maybe "" (\s -> "|@" <> showT s ) mSampling
-        name = (statsdPrefix cfg) <> n
-        msg  = name <> ":" <> (showT val) <> "|" <> kind <> sampling
-    when (statsdVerbose cfg) (T.putStrLn $ "Sending metric: " <> msg)
-    void $ (try $ send sock $ T.encodeUtf8 msg :: IO(Either SomeException Int))
-    putMVar pickle pick
+    mPick <- gpPickle <$> atomically (readTVar pickle)
+    case mPick of
+        Nothing -> pure () -- no connection, give up.
+        Just (Pickle sock cfg) -> do
+            let tags = parseTags $ (fromMaybe M.empty mTags) <> (statsdTags cfg)
+                sampling = maybe "" (\s -> "|@" <> showT s ) mSampling
+                name = (statsdPrefix cfg) <> n
+                msg  = name <> ":" <> (showT val) <> "|" <> kind <> sampling
+            when (statsdVerbose cfg) (T.putStrLn $ "Sending metric: " <> msg)
+            void $ (try $ send sock $ T.encodeUtf8 msg :: IO(Either SomeException Int))
 
 -- | Parse tags into string to send.
 parseTags :: Tags -> T.Text
-parseTags tags 
+parseTags tags
     | M.null tags = ""
     | otherwise   = parsed where
         parsed  = "#|" <> trimmed
         trimmed = T.dropEnd 1 catted
         catted  = M.foldrWithKey (\k a b -> b <> k <> ":" <> a <> ",") "" tags
 
--- | Internal MVar keeping track of singleton connection.
-pickle :: MVar Pickle
-pickle = unsafePerformIO $ newEmptyMVar :: MVar Pickle
+data GlobalPickle = GlobalPickle {
+    gpSetupRunning :: Bool
+  , gpPickle       :: Maybe Pickle
+  }
+
+-- | Internal TVar keeping track of singleton connection.
+pickle :: TVar GlobalPickle
+pickle = unsafePerformIO $ newTVarIO $ GlobalPickle False Nothing
 {-# NOINLINE pickle #-}
 
 -- | Start the connection for our Pickle
