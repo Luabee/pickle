@@ -2,7 +2,7 @@
 Instant StatsD in Haskell. Easy to implement in a program you've already written without any refactoring to pass any sockets/configuration around.
 
 ## Usage
-Call `withPickleDo defaultConfig` with your main function, e.g.
+Call `setupPickle defaultConfig` with your main function, e.g.
 ```haskell
 {-# LANGUAGE OverloadedStrings #-}
 import qualified Data.Map.Strict as M
