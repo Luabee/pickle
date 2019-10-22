@@ -1,6 +1,6 @@
 cabal-version:       2.4
 name:                pickle
-version:             0.1.0.1
+version:             1.0.0.0
 synopsis:            Instant StatsD in Haskell
 description:         Instant StatsD in Haskell
 bug-reports:         https://github.com/Luabee/pickle/issues
