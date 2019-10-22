@@ -8,7 +8,7 @@ Call `withPickleDo defaultConfig` with your main function, e.g.
 import qualified Data.Map.Strict as M
 
 main :: IO()
-main = withPickleDo defaultConfig $ do
+main = setupPickle defaultConfig $ do
 {...}
 ```
 Then to send metrics you can just call one of these functions:
