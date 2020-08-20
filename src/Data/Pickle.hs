@@ -28,7 +28,7 @@ import Control.Monad.IO.Class
 import System.IO.Unsafe
 import Control.Concurrent.STM
 
--- | Tags for DogStatsD
+-- | Tags for DogStatsD. Use empty text for rhs to send a keyed tag with no value. Example: M.fromList [("flag", "")]
 type Tags = M.Map T.Text T.Text
 
 -- | Configuration for the UDP connection used
@@ -137,7 +137,7 @@ parseTags tags
     | otherwise   = parsed where
         parsed  = "#|" <> trimmed
         trimmed = T.dropEnd 1 catted
-        catted  = M.foldrWithKey (\k a b -> b <> k <> ":" <> a <> ",") "" tags
+        catted  = M.foldrWithKey (\k a b -> b <> k <> (if T.null a then "" else (":" <> a)) <> ",") "" tags
 
 data GlobalPickle = GlobalPickle {
     gpSetupRunning :: Bool
